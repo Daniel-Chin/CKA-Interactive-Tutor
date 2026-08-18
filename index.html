@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CKA Interactive Tutor</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; }
+    body { margin: 20px; max-width: 980px; }
+    .vectors { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .panel { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+    .slider-row { display: grid; grid-template-columns: 1.4em 1fr 4.5em; align-items: center; gap: 8px; margin: 6px 0; }
+    .matrices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 18px; }
+    canvas { width: 160px; height: 160px; border: 1px solid #aaa; image-rendering: pixelated; }
+    code { font-size: 1.15rem; }
+  </style>
+</head>
+<body>
+  <h1>Centered Kernel Alignment (5D)</h1>
+  <p>Adjust vectors <strong>a</strong> and <strong>b</strong> with sliders. The plots visualize squared matrix values as pixel luminosity.</p>
+
+  <section class="vectors">
+    <div class="panel">
+      <h2>Vector a</h2>
+      <div id="a-sliders"></div>
+    </div>
+    <div class="panel">
+      <h2>Vector b</h2>
+      <div id="b-sliders"></div>
+    </div>
+  </section>
+
+  <section class="matrices">
+    <div class="panel">
+      <h3>Centered Gram(a)</h3>
+      <canvas id="mat-a" width="5" height="5" aria-label="Centered Gram matrix of a"></canvas>
+    </div>
+    <div class="panel">
+      <h3>Centered Gram(b)</h3>
+      <canvas id="mat-b" width="5" height="5" aria-label="Centered Gram matrix of b"></canvas>
+    </div>
+    <div class="panel">
+      <h3>Product Ka × Kb</h3>
+      <canvas id="mat-p" width="5" height="5" aria-label="Product of centered Gram matrices"></canvas>
+    </div>
+  </section>
+
+  <p>CKA: <code id="cka-value">0.000000e+0</code></p>
+
+  <script>
+    const n = 5;
+    const a = [1, 2, 3, 4, 5];
+    const b = [5, 4, 3, 2, 1];
+
+    function createSliders(targetId, vector) {
+      const root = document.getElementById(targetId);
+      for (let i = 0; i < n; i++) {
+        const row = document.createElement('label');
+        row.className = 'slider-row';
+
+        const axis = document.createElement('span');
+        axis.textContent = `${i + 1}`;
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '-5';
+        slider.max = '5';
+        slider.step = '0.1';
+        slider.value = String(vector[i]);
+
+        const value = document.createElement('output');
+        value.textContent = Number(vector[i]).toFixed(1);
+
+        slider.addEventListener('input', () => {
+          vector[i] = Number(slider.value);
+          value.textContent = vector[i].toFixed(1);
+          update();
+        });
+
+        row.append(axis, slider, value);
+        root.appendChild(row);
+      }
+    }
+
+    function outer(v) {
+      return v.map(vi => v.map(vj => vi * vj));
+    }
+
+    function center(K) {
+      const rowMeans = K.map(row => row.reduce((s, x) => s + x, 0) / n);
+      const colMeans = Array.from({ length: n }, (_, j) => K.reduce((s, row) => s + row[j], 0) / n);
+      const totalMean = rowMeans.reduce((s, x) => s + x, 0) / n;
+      return K.map((row, i) => row.map((x, j) => x - rowMeans[i] - colMeans[j] + totalMean));
+    }
+
+    function multiply(A, B) {
+      return Array.from({ length: n }, (_, i) =>
+        Array.from({ length: n }, (_, j) => {
+          let s = 0;
+          for (let k = 0; k < n; k++) s += A[i][k] * B[k][j];
+          return s;
+        })
+      );
+    }
+
+    function frobeniusSq(M) {
+      return M.flat().reduce((s, x) => s + x * x, 0);
+    }
+
+    function trace(M) {
+      let s = 0;
+      for (let i = 0; i < n; i++) {
+        s += M[i][i];
+      }
+      return s;
+    }
+
+    function drawMatrix(canvasId, M) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      let maxSq = 1e-12;
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          const sq = M[i][j] * M[i][j];
+          if (sq > maxSq) maxSq = sq;
+        }
+      }
+      const image = ctx.createImageData(n, n);
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          const lum = Math.round((M[i][j] * M[i][j] / maxSq) * 255);
+          const p = (i * n + j) * 4;
+          image.data[p] = lum;
+          image.data[p + 1] = lum;
+          image.data[p + 2] = lum;
+          image.data[p + 3] = 255;
+        }
+      }
+      ctx.putImageData(image, 0, 0);
+    }
+
+    function update() {
+      const Ka = center(outer(a));
+      const Kb = center(outer(b));
+      const product = multiply(Ka, Kb);
+
+      drawMatrix('mat-a', Ka);
+      drawMatrix('mat-b', Kb);
+      drawMatrix('mat-p', product);
+
+      const numerator = trace(product);
+      const denom = Math.sqrt(frobeniusSq(Ka) * frobeniusSq(Kb));
+      const cka = denom > 0 ? numerator / denom : 0;
+      document.getElementById('cka-value').textContent = cka.toExponential(6);
+    }
+
+    createSliders('a-sliders', a);
+    createSliders('b-sliders', b);
+    update();
+  </script>
+</body>
+</html>
