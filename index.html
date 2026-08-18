@@ -11,6 +11,7 @@
     .panel { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
     .slider-row { display: grid; grid-template-columns: 1.4em 1fr 4.5em; align-items: center; gap: 8px; margin: 6px 0; }
     .matrices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 18px; }
+    .matrix-metric { margin: 8px 0 0; }
     canvas { width: 160px; height: 160px; border: 1px solid #aaa; image-rendering: pixelated; }
     code { font-size: 1.15rem; }
   </style>
@@ -18,6 +19,7 @@
 <body>
   <h1>Centered Kernel Alignment (5D)</h1>
   <p>Adjust vectors <strong>a</strong> and <strong>b</strong> with sliders. The plots visualize squared matrix values as pixel luminosity.</p>
+  <p>With these 5 coordinates treated as aligned samples, permuting only one vector changes CKA because it changes which samples are paired; permuting both vectors the same way leaves CKA unchanged.</p>
 
   <section class="vectors">
     <div class="panel">
@@ -34,14 +36,17 @@
     <div class="panel">
       <h3>Centered Gram(a)</h3>
       <canvas id="mat-a" width="5" height="5" aria-label="Centered Gram matrix of a"></canvas>
+      <p class="matrix-metric"><code id="norm-a">||Ka||F = 0.000000e+0</code></p>
     </div>
     <div class="panel">
       <h3>Centered Gram(b)</h3>
       <canvas id="mat-b" width="5" height="5" aria-label="Centered Gram matrix of b"></canvas>
+      <p class="matrix-metric"><code id="norm-b">||Kb||F = 0.000000e+0</code></p>
     </div>
     <div class="panel">
       <h3>Product Ka × Kb</h3>
       <canvas id="mat-p" width="5" height="5" aria-label="Product of centered Gram matrices"></canvas>
+      <p class="matrix-metric"><code id="trace-p">tr(KaKb) = 0.000000e+0</code></p>
     </div>
   </section>
 
@@ -86,11 +91,9 @@
       return v.map(vi => v.map(vj => vi * vj));
     }
 
-    function center(K) {
-      const rowMeans = K.map(row => row.reduce((s, x) => s + x, 0) / n);
-      const colMeans = Array.from({ length: n }, (_, j) => K.reduce((s, row) => s + row[j], 0) / n);
-      const totalMean = rowMeans.reduce((s, x) => s + x, 0) / n;
-      return K.map((row, i) => row.map((x, j) => x - rowMeans[i] - colMeans[j] + totalMean));
+    function centerVector(v) {
+      const mean = v.reduce((s, x) => s + x, 0) / n;
+      return v.map(x => x - mean);
     }
 
     function multiply(A, B) {
@@ -105,6 +108,10 @@
 
     function frobeniusSq(M) {
       return M.flat().reduce((s, x) => s + x * x, 0);
+    }
+
+    function frobenius(M) {
+      return Math.sqrt(frobeniusSq(M));
     }
 
     function trace(M) {
@@ -140,8 +147,10 @@
     }
 
     function update() {
-      const Ka = center(outer(a));
-      const Kb = center(outer(b));
+      const centeredA = centerVector(a);
+      const centeredB = centerVector(b);
+      const Ka = outer(centeredA);
+      const Kb = outer(centeredB);
       const product = multiply(Ka, Kb);
 
       drawMatrix('mat-a', Ka);
@@ -149,8 +158,13 @@
       drawMatrix('mat-p', product);
 
       const numerator = trace(product);
-      const denom = Math.sqrt(frobeniusSq(Ka) * frobeniusSq(Kb));
+      const normKa = frobenius(Ka);
+      const normKb = frobenius(Kb);
+      const denom = normKa * normKb;
       const cka = denom > 0 ? numerator / denom : 0;
+      document.getElementById('norm-a').textContent = `||Ka||F = ${normKa.toExponential(6)}`;
+      document.getElementById('norm-b').textContent = `||Kb||F = ${normKb.toExponential(6)}`;
+      document.getElementById('trace-p').textContent = `tr(KaKb) = ${numerator.toExponential(6)}`;
       document.getElementById('cka-value').textContent = cka.toExponential(6);
     }
 
