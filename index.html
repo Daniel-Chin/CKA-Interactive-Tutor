@@ -18,16 +18,16 @@
 </head>
 <body>
   <h1>Centered Kernel Alignment (5D)</h1>
-  <p>Adjust vectors <strong>a</strong> and <strong>b</strong> with sliders. The plots visualize squared matrix values as pixel luminosity.</p>
-  <p>With these 5 coordinates treated as aligned samples, permuting only one vector changes CKA because it changes which samples are paired; permuting both vectors the same way leaves CKA unchanged.</p>
+  <p>Adjust the 5 feature dimensions of vectors <strong>a</strong> and <strong>b</strong> with the sliders. The plots visualize squared matrix values as pixel luminosity.</p>
+  <p>Permuting only one vector changes CKA because it changes which feature dimensions are aligned across <strong>a</strong> and <strong>b</strong>; applying the same permutation to both vectors leaves the value unchanged.</p>
 
   <section class="vectors">
     <div class="panel">
-      <h2>Vector a</h2>
+      <h2>Feature vector a</h2>
       <div id="a-sliders"></div>
     </div>
     <div class="panel">
-      <h2>Vector b</h2>
+      <h2>Feature vector b</h2>
       <div id="b-sliders"></div>
     </div>
   </section>
